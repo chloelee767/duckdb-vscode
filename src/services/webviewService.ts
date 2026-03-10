@@ -390,6 +390,10 @@ function setupMessageHandler(
           );
           break;
 
+        case "copyToClipboard":
+          await handleCopyToClipboard(panel, message);
+          break;
+
         case "requestColumnSummaries":
           await handleRequestColumnSummaries(panel, message, db);
           break;
@@ -599,6 +603,21 @@ async function handleRequestCopyData(
       type: "copyData",
       error: String(error),
     });
+  }
+}
+
+/**
+ * Handle 'copyToClipboard' message - write text to system clipboard via VS Code API
+ */
+async function handleCopyToClipboard(
+  panel: vscode.WebviewPanel,
+  message: { text: string; label: string }
+): Promise<void> {
+  try {
+    await vscode.env.clipboard.writeText(message.text);
+    panel.webview.postMessage({ type: "copyResult", label: message.label });
+  } catch (error) {
+    panel.webview.postMessage({ type: "copyResult", error: String(error) });
   }
 }
 

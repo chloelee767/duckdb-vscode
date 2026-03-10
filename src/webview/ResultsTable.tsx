@@ -205,15 +205,17 @@ export function ResultsTable({
         } else if (message.data) {
           const { columns: copyColumns, rows: copyRows, maxCopyRows: limit } = message.data;
           const text = formatTableAsText(copyColumns, copyRows);
-          navigator.clipboard.writeText(text).then(() => {
-            const rowCount = copyRows.length;
-            const label = rowCount >= limit 
-              ? `${rowCount.toLocaleString()} rows (limit)` 
-              : `${rowCount.toLocaleString()} rows`;
-            toast.show(`Copied ${label}`);
-          }).catch(() => {
-            toast.show('Failed to copy');
-          });
+          const rowCount = copyRows.length;
+          const label = rowCount >= limit
+            ? `${rowCount.toLocaleString()} rows (limit)`
+            : `${rowCount.toLocaleString()} rows`;
+          copyToClipboard(text, label);
+        }
+      } else if (message.type === 'copyResult') {
+        if (message.error) {
+          toast.show('Failed to copy');
+        } else {
+          toast.show(`Copied ${message.label}`);
         }
       } else if (message.type === 'refreshError') {
         setIsRefreshing(false);
@@ -399,15 +401,13 @@ export function ResultsTable({
     setColumnWidths(prev => ({ ...prev, [column]: Math.max(50, width) }));
   }, []);
 
-  // Copy to clipboard (for current page selection)
-  const copyToClipboard = useCallback(async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.show(`Copied ${label}`);
-    } catch {
-      toast.show('Failed to copy');
+  // Copy to clipboard - routes through extension host for reliable system clipboard access
+  const copyToClipboard = useCallback((text: string, label: string) => {
+    const vscode = getVscodeApi();
+    if (vscode) {
+      vscode.postMessage({ type: 'copyToClipboard', text, label });
     }
-  }, [toast]);
+  }, []);
 
   // Copy full table from server (up to maxCopyRows)
   const copyFullTable = useCallback(() => {
