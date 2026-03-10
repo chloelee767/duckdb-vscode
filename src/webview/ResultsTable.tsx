@@ -128,6 +128,9 @@ export function ResultsTable({
   // Table wrapper ref
   const tableWrapperRef = useRef<HTMLDivElement>(null);
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
   // Reset state when switching statements (cacheId changes)
   useEffect(() => {
     // Reset column stats
@@ -567,6 +570,19 @@ export function ResultsTable({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [getSelectionText, getSelectionLabel, copyToClipboard, selectAll]);
 
+  // Dismiss context menu on outside click
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (!target.closest('.context-menu')) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [contextMenu]);
+
   // Selection info
   const selectionInfo = useMemo(() => {
     if (!selection) return null;
@@ -885,7 +901,14 @@ export function ResultsTable({
             />
           )}
           
-          <table>
+          <table
+            onContextMenu={(e) => {
+              if (selection) {
+                e.preventDefault();
+                setContextMenu({ x: e.clientX, y: e.clientY });
+              }
+            }}
+          >
             <thead>
               <tr>
                 <th className="row-number-header">#</th>
@@ -1007,6 +1030,24 @@ export function ResultsTable({
           </PopoverMenu>
         </div>
       </div>
+      )}
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <button
+            className="context-menu-item"
+            onClick={() => {
+              copyToClipboard(getSelectionText(), getSelectionLabel());
+              setContextMenu(null);
+            }}
+          >
+            Copy
+          </button>
+        </div>
       )}
     </div>
   );
