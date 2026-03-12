@@ -83,7 +83,8 @@ export function ResultsTable({
   interface CellPosition { row: number; col: number; }
   interface Selection { start: CellPosition; end: CellPosition; }
   const [selection, setSelection] = useState<Selection | null>(null);
-  
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+
   // Toast notification
   const toast = useToast();
   
@@ -509,6 +510,15 @@ export function ResultsTable({
     }
   }, [selection, displayRows.length]);
 
+  // Handle right-click context menu
+  const handleContextMenu = useCallback((e: React.MouseEvent, rowIdx?: number, colIdx?: number) => {
+    e.preventDefault();
+    if (rowIdx !== undefined && colIdx !== undefined && !isCellSelected(rowIdx, colIdx)) {
+      setSelection({ start: { row: rowIdx, col: colIdx }, end: { row: rowIdx, col: colIdx } });
+    }
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
+  }, [isCellSelected]);
+
   // Select all (current page)
   const selectAll = useCallback(() => {
     if (displayRows.length === 0) return;
@@ -561,11 +571,20 @@ export function ResultsTable({
       }
       if (e.key === 'Escape') {
         setSelection(null);
+        setContextMenuPos(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [getSelectionText, getSelectionLabel, copyToClipboard, selectAll]);
+
+  // Dismiss context menu on outside click
+  useEffect(() => {
+    if (!contextMenuPos) return;
+    const dismiss = () => setContextMenuPos(null);
+    window.addEventListener('click', dismiss);
+    return () => window.removeEventListener('click', dismiss);
+  }, [contextMenuPos]);
 
   // Selection info
   const selectionInfo = useMemo(() => {
@@ -913,16 +932,17 @@ export function ResultsTable({
             <tbody>
               {displayRows.map((row, rowIdx) => (
                 <tr key={rowIdx} className={isRowSelected(rowIdx) ? 'row-selected' : ''}>
-                  <td className="row-number" onClick={(e) => handleRowSelect(rowIdx, e)}>
+                  <td className="row-number" onClick={(e) => handleRowSelect(rowIdx, e)} onContextMenu={(e) => handleContextMenu(e, rowIdx, 0)}>
                     {rowNumberOffset + rowIdx + 1}
                   </td>
                   {columns.map((col, colIdx) => (
-                    <td 
+                    <td
                       key={colIdx}
                       className={isCellSelected(rowIdx, colIdx) ? 'selected' : ''}
                       style={columnWidths[col] ? { width: columnWidths[col], minWidth: columnWidths[col], maxWidth: columnWidths[col] } : undefined}
                       onClick={(e) => handleCellClick(rowIdx, colIdx, e)}
                       onDoubleClick={() => handleCellDoubleClick(rowIdx, colIdx)}
+                      onContextMenu={(e) => handleContextMenu(e, rowIdx, colIdx)}
                     >
                       <CellValue value={row[col]} />
                     </td>
@@ -1007,6 +1027,23 @@ export function ResultsTable({
           </PopoverMenu>
         </div>
       </div>
+      )}
+
+      {contextMenuPos && (
+        <div
+          className="context-menu"
+          style={{ top: contextMenuPos.y, left: contextMenuPos.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              copyToClipboard(getSelectionText(), getSelectionLabel());
+              setContextMenuPos(null);
+            }}
+          >
+            Copy
+          </button>
+        </div>
       )}
     </div>
   );
